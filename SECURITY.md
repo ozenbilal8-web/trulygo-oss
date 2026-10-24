@@ -90,6 +90,10 @@ automatic review took place. Never treat a missing worker as an approval.
 
 `src/lib/rate-limit.ts` calls the database-backed fixed-window limiter.
 `public.rate_limits` stores a hash of the action/key rather than the raw key.
+Only the server service role may call the limiter RPC. Public and signed-in
+clients cannot choose or consume another account's rate-limit bucket directly.
+The server credential is required for authentication rate limiting as well as
+trusted link creation; missing credentials make authentication fail closed.
 Existing limits include:
 
 | Action | Limit | RPC failure behavior |
@@ -103,7 +107,7 @@ Existing limits include:
 | Vitrine upload by user / IP | 10 per 30 min / 20 per 30 min | Fail open |
 
 Uploads consume limits when a real avatar/banner file is submitted. Global
-rate limiting is not applied to every public route. The legacy limiter is not
+rate limiting is not applied to every public route. The limiter is not
 a substitute for trusted safety attestation, RLS, or admin review. Consider
 these explicit fail-open cases when evaluating abuse risk.
 

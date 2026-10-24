@@ -1,9 +1,11 @@
+import "server-only";
+
 import { headers } from "next/headers";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createAnonymousClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // Fail mode controls what happens if the rate-limit RPC errors or Supabase
-// is not configured. Auth endpoints prefer "fail-closed" (block on infra
+// or its server credential is not configured. Auth endpoints prefer "fail-closed" (block on infra
 // failure) because the cost of letting one extra brute-force attempt through
 // is low compared to a silent bypass. Link creation prefers "fail-open"
 // (allow on infra failure) so a transient DB hiccup does not block real
@@ -77,7 +79,9 @@ export async function checkRateLimit({
   }
 
   try {
-    const supabase = createAnonymousClient();
+    // The RPC accepts server-selected buckets and must never be callable by a
+    // public client: otherwise callers could consume someone else's quota.
+    const supabase = createAdminClient();
     const { data, error } = await supabase.rpc("check_rate_limit", {
       p_action: action,
       p_key: normalizedKey,

@@ -22,6 +22,15 @@ Missing Web Risk configuration leaves requests for manual review. Optional
 email, automated approval, and hosted integrations require separate setup.
 Approval does not guarantee that a destination remains safe after review.
 
+## Screenshots
+
+Actual captures from the isolated local production build. The UTM example is
+synthetic; these images are not evidence of users, adoption, or campaign results.
+
+![TrulyGo OSS homepage](docs/screenshots/home.png)
+
+![Public UTM builder with a synthetic example](docs/screenshots/utm-builder.png)
+
 ## Development
 
 Requirements: Node.js 24, npm, and, for data-backed features, Docker and the
@@ -53,6 +62,8 @@ npm run build
 npm run typecheck
 npm run audit
 npm run licenses
+npx playwright install chromium
+npm run test:e2e
 ```
 
 The Node suite includes unit and source-contract tests. Those checks are

@@ -155,6 +155,7 @@ supabase/.branches/
 
 # Local browser test outputs can contain synthetic session state
 playwright-report/
+output/playwright/
 test-results/
 playwright/.cache/
 .auth/

@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 // This suite owns its server; it must never attach to a personal or hosted app.
 const port = process.env.E2E_PORT ?? "3100";
-if (!/^\d{4,5}$/.test(port) || Number(port) > 65535) {
+if (!/^\d{4,5}$/.test(port) || Number(port) < 1000 || Number(port) > 65535) {
   throw new Error("E2E_PORT must be a numeric local port between 1000 and 65535.");
 }
 const baseURL = `http://127.0.0.1:${port}`;

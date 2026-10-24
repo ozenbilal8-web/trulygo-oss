@@ -75,8 +75,13 @@ until reviewed. Approved destinations cannot be edited.
 With the application running, execute the dedicated integration script:
 
 ```sh
-node scripts/test-local.mjs
+npm run test:local
 ```
+
+Stop your development server first. This runner refuses an occupied port 3000,
+rebuilds with the verified local backend and disabled external integrations,
+starts its own application server, and stops only that server when finished.
+Do not invoke the lower-level `scripts/test-local.mjs` directly.
 
 Read its output and scope, then perform the browser checks in
 [DEVELOPMENT.md](DEVELOPMENT.md). It is separate from `npm test`.
@@ -91,7 +96,7 @@ Use a different secret and backend for each environment.
 | `NEXT_PUBLIC_SUPABASE_URL` | Your instance's Auth/API URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser-safe publishable or legacy anon key |
 | `NEXT_PUBLIC_APP_URL` | Your instance's canonical origin; local default is `http://localhost:3000` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only key for trusted link creation and privileged operations |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only key required for authentication rate limits, trusted link creation and privileged operations |
 | `TRULYGO_TRUSTED_LINK_CREATE_V2` | Exact value `true` for a fully migrated fresh instance |
 | `CLICK_VISITOR_HASH_SECRET` | Private random value for visitor/deduplication hashes |
 | `GOOGLE_WEB_RISK_API_KEY` | Optional Google Web Risk screening credential |
@@ -107,6 +112,12 @@ Only public configuration belongs in a `NEXT_PUBLIC_` variable. Never put a
 service-role key, API credential, webhook secret, or hash secret there.
 The fully migrated database closes direct client INSERT into link requests;
 setting the trusted V2 flag to `false` is not a supported fresh-install fix.
+
+Slug writes require PostgreSQL's default READ COMMITTED isolation (the mode
+used by PostgREST). Namespace triggers serialize conflicting main/channel slug
+writes and check rows independently of caller visibility. The hardening
+migration refuses any pre-existing cross-table collision for an operator to
+resolve; it never deletes or renames existing links automatically.
 
 ## Optional integrations
 

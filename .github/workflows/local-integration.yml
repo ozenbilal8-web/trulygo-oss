@@ -21,6 +21,8 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
       # These run only on an ephemeral runner. No repository/hosting secrets.
       SUPABASE_TELEMETRY_DISABLED: '1'
+      # Official Supabase Docker Hub images avoid ECR anonymous pull limits.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: docker.io
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -42,25 +44,11 @@ jobs:
             exit 1
           fi
           node scripts/setup-local.mjs
-      - name: Build against isolated local configuration
-        run: npm run build
-      - name: Start local application
-        shell: bash
-        run: |
-          npm start > "$RUNNER_TEMP/trulygo-start.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/trulygo.pid"
-          for attempt in $(seq 1 40); do
-            if curl --silent --fail http://localhost:3000/login > /dev/null; then exit 0; fi
-            sleep 1
-          done
-          node scripts/redact-local-log.mjs "$RUNNER_TEMP/trulygo-start.log"
-          exit 1
-      - name: Verify signup, login, RLS, link review and HTTP redirection
-        run: node scripts/test-local.mjs
+      - name: Build and verify with an exclusively owned local app server
+        run: npm run test:local
       - name: Stop the disposable stack
         if: always()
         shell: bash
         run: |
-          if test -f "$RUNNER_TEMP/trulygo.pid"; then kill "$(cat "$RUNNER_TEMP/trulygo.pid")" || true; fi
           npx --no-install supabase stop --no-backup > "$RUNNER_TEMP/supabase-stop.log" 2>&1 || true
           rm -f .env.local

@@ -60,9 +60,9 @@ export async function createLinkRequestAction(formData: FormData) {
     redirect("/dashboard?error=unauthenticated");
   }
 
-  // Temporary legacy limiter: its caller-controlled RPC is not the trusted
-  // creation boundary. It remains fail-open in EXPAND to preserve product
-  // behaviour; the V2 attestation + pending review path is the safety boundary.
+  // Rate-limit buckets are selected and written only by the server. Link
+  // creation retains its documented fail-open behavior on limiter failure;
+  // V2 safety attestation and pending review remain separate boundaries.
   const ipKey = await getClientIp();
 
   const userAllowed = await checkRateLimit({

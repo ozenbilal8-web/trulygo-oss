@@ -28,7 +28,7 @@ const test = base.extend<{ localTrafficOnly: void }>({
 async function openHome(page: Page) {
   const response = await page.goto("/");
   expect(response?.status()).toBe(200);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("UTM'li Link");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(/UTM['’]li Link/);
   await page.getByRole("button", { name: "Reddet", exact: true }).click();
 }
 
@@ -52,7 +52,11 @@ test("the unauthenticated homepage and UTM tool render", async ({ page }) => {
   if (captureScreenshots) {
     await mkdir(screenshotDirectory, { recursive: true });
     await page.evaluate(() => document.fonts.ready);
-    await page.screenshot({ path: path.join(screenshotDirectory, "home.png"), animations: "disabled" });
+    await page.screenshot({
+      path: path.join(screenshotDirectory, "home.png"),
+      clip: { x: 0, y: 0, width: 1440, height: 900 },
+      animations: "disabled",
+    });
   }
 
   await page.locator('a[href="#utm-link-olusturucu"]').first().click();
@@ -78,10 +82,17 @@ test("a visitor generates and copies a UTM URL, then carries its draft to signup
   if (captureScreenshots) {
     await mkdir(screenshotDirectory, { recursive: true });
     await page.evaluate(() => document.fonts.ready);
+    // Fit the whole tool in the viewport so the sticky navigation stays above
+    // the element capture instead of appearing across the middle of it.
+    await page.setViewportSize({ width: 1440, height: 1800 });
+    await page.locator("#utm-link-olusturucu").evaluate((element) => {
+      element.scrollIntoView({ block: "start", behavior: "instant" });
+    });
     await page.locator("#utm-link-olusturucu").screenshot({
       path: path.join(screenshotDirectory, "utm-builder.png"),
       animations: "disabled",
     });
+    await page.setViewportSize({ width: 1440, height: 1000 });
   }
 
   await page.locator('#utm-link-olusturucu a[href="/register"]').click();

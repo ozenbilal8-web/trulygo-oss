@@ -5,6 +5,11 @@ import { readLocalEnv } from './local-env.mjs';
 
 // Runs against the dedicated loopback stack only. Never follows external URLs.
 // Test identities and sessions are temporary and are removed in finally.
+// This parent-PID marker prevents accidental direct use; it is not an
+// authentication/security boundary against a malicious local process.
+if (process.env.TRULYGO_LOCAL_TEST_RUNNER !== String(process.ppid)) {
+  throw new Error('Use npm run test:local. The owned server runner is required.');
+}
 const env = readLocalEnv();
 const api = env.NEXT_PUBLIC_SUPABASE_URL;
 const app = env.NEXT_PUBLIC_APP_URL;
@@ -20,6 +25,17 @@ const sessions = new Map();
 let completed = 0;
 function passed(label) { completed++; console.log(`PASS ${label}`); }
 function check(value, label) { assert.ok(value, label); }
+
+function fetchOwnedApp(url, options = {}) {
+  const target = new URL(url, app);
+  check(target.origin === app, 'HTTP flow must stay on the local application origin');
+  // Connect explicitly to the owned IPv4 listener, while keeping the configured
+  // Host/Origin for cookie and Server Action behavior. Never resolve localhost
+  // to another IPv6 listener.
+  const host = target.host;
+  target.hostname = '127.0.0.1';
+  return fetch(target, { ...options, redirect: 'manual', headers: { ...options.headers, Host: host } });
+}
 
 async function request(path, { token = anon, method = 'GET', body, prefer } = {}) {
   const response = await fetch(`${api}${path}`, {
@@ -38,7 +54,7 @@ function client() {
   return async (path, options = {}) => {
     const url = new URL(path, app);
     check(url.origin === app, 'HTTP flow must stay on the local application origin');
-    const response = await fetch(url, {
+    const response = await fetchOwnedApp(url, {
       ...options, redirect: 'manual', signal: AbortSignal.timeout(30000),
       headers: { Origin: app, Cookie: [...jar].map(([key, value]) => `${key}=${value}`).join('; '), ...options.headers },
     });
@@ -133,19 +149,31 @@ try {
 
   const pending = await request('/rest/v1/rpc/resolve_public_link_redirect', { method: 'POST', body: { p_slug: slug } });
   check(pending.ok && pending.data?.length === 0, 'Pending links are absent from the public resolver');
-  const pendingPage = await fetch(`${app}/${slug}`, { redirect: 'manual' });
+  const pendingPage = await fetchOwnedApp(`${app}/${slug}`);
   check(pendingPage.status === 200 && !pendingPage.headers.has('location'), 'Pending link does not redirect');
   passed('pending link is not publicly redirected');
 
   const stranger = await createTestUser('stranger');
   const strangerToken = await tokenFor(stranger.email);
   const ownerToken = await tokenFor(ownerEmail);
+  const limiterInput = { p_action: 'local:integration', p_key: runId, p_limit: 2, p_window_seconds: 60 };
+  for (const token of [anon, ownerToken]) {
+    const deniedLimiter = await request('/rest/v1/rpc/check_rate_limit', { token, method: 'POST', body: limiterInput });
+    check(!deniedLimiter.ok && [401, 403, 404].includes(deniedLimiter.status), 'Browser-facing roles cannot invoke the rate limiter RPC');
+  }
+  const allowedLimiter = await request('/rest/v1/rpc/check_rate_limit', { token: service, method: 'POST', body: limiterInput });
+  check(allowedLimiter.ok && allowedLimiter.data === true, 'Trusted server can invoke the rate limiter RPC');
+  passed('rate limiting requires the service role; anonymous and user RPC calls are denied');
   const otherRows = await request(`/rest/v1/link_requests?id=eq.${record.id}&select=id`, { token: strangerToken });
   check(otherRows.ok && otherRows.data?.length === 0, 'RLS hides another account\'s link');
   const otherProfiles = await request(`/rest/v1/profiles?id=eq.${ownerId}&select=id`, { token: strangerToken });
   check(otherProfiles.ok && otherProfiles.data?.length === 0, 'RLS hides another account\'s profile');
   const anonymousRows = await request('/rest/v1/link_requests?select=id');
   check(!anonymousRows.ok && [401, 403].includes(anonymousRows.status), 'Anonymous direct table access is denied');
+  for (const path of ['/rest/v1/link_requests?select=requested_slug,target_url', '/rest/v1/channel_links?select=slug,user_id']) {
+    const anonymousColumns = await request(path);
+    check(!anonymousColumns.ok && [401, 403].includes(anonymousColumns.status), 'Anonymous direct column-select is denied on both link tables');
+  }
   const escalation = await request(`/rest/v1/profiles?id=eq.${ownerId}`, { token: ownerToken, method: 'PATCH', body: { role: 'admin' } });
   check(!escalation.ok, 'A user cannot promote their profile role');
   const directInsert = await request('/rest/v1/link_requests', { token: ownerToken, method: 'POST', body: { user_id: ownerId, target_url: destination, requested_slug: `${slug}-forged` } });
@@ -167,9 +195,48 @@ try {
   check(new URL(review.headers.get('location'), app).searchParams.get('message') === 'request_approved', 'Review action confirms approval');
   passed('administrator manual approval through the real Server Action');
 
+  const privateDestination = `https://example.net/private-${runId}`;
+  const createOtherMain = requestedSlug => request('/rest/v1/rpc/create_link_request_v2', {
+    token: service, method: 'POST',
+    body: {
+      p_user_id: stranger.id, p_target_url: privateDestination, p_requested_slug: requestedSlug,
+      p_campaign_name: null, p_note: null, p_safety_status: 'unverified', p_safety_verified_at: null,
+      p_safety_policy_version: 'local-integration', p_web_risk_status: 'skipped', p_web_risk_threats: [],
+      p_web_risk_checked_at: new Date().toISOString(),
+    },
+  });
+  const createOwnerChannel = (channelSlug, key) => request('/rest/v1/channel_links', {
+    token: ownerToken, method: 'POST', prefer: 'return=representation',
+    body: { link_request_id: record.id, user_id: ownerId, slug: channelSlug, channel_key: key, channel_label: 'Local integration', utm_source: 'local', utm_medium: 'test', utm_campaign: 'integration' },
+  });
+  const pendingOther = await createOtherMain(`${slug}-other-pending`);
+  check(pendingOther.ok && pendingOther.data?.length === 1, 'Cross-owner pending namespace fixture exists');
+  const hiddenPending = await request(`/rest/v1/link_requests?id=eq.${pendingOther.data[0].id}&select=id`, { token: ownerToken });
+  check(hiddenPending.ok && hiddenPending.data?.length === 0, 'Namespace collision fixture is hidden by RLS');
+  const blockedChannel = await createOwnerChannel(`${slug}-other-pending`, 'cross-owner-blocked');
+  check(!blockedChannel.ok && blockedChannel.data?.code === '23505', 'A hidden pending main slug blocks channel creation by another owner');
+  const errorText = JSON.stringify(blockedChannel.data);
+  check(!errorText.includes(stranger.id) && !errorText.includes(privateDestination), 'Namespace conflict does not disclose another owner or destination');
+
+  const existingChannel = await createOwnerChannel(`${slug}-channel`, 'existing-channel');
+  check(existingChannel.ok && existingChannel.data?.length === 1, 'Channel creation with an unclaimed slug succeeds');
+  const blockedMain = await createOtherMain(`${slug}-channel`);
+  check(!blockedMain.ok && blockedMain.data?.code === '23505', 'An existing channel blocks another owner\'s new main request');
+  const rejectedOther = await request(`/rest/v1/link_requests?id=eq.${pendingOther.data[0].id}`, { token: service, method: 'PATCH', prefer: 'return=representation', body: { status: 'rejected' } });
+  check(rejectedOther.ok && rejectedOther.data?.length === 1, 'Pending namespace fixture becomes inactive');
+  const reclaimedInactive = await createOwnerChannel(`${slug}-other-pending`, 'inactive-main-reuse');
+  check(reclaimedInactive.ok && reclaimedInactive.data?.length === 1, 'An inactive main request does not reserve a channel slug');
+
+  const simultaneous = await Promise.all([
+    createOwnerChannel(`${slug}-race`, 'namespace-race'),
+    createOtherMain(`${slug}-race`),
+  ]);
+  check(simultaneous.filter(result => result.ok).length === 1 && simultaneous.filter(result => !result.ok && result.data?.code === '23505').length === 1, 'Concurrent cross-table claims admit exactly one namespace owner');
+  passed('main/channel namespace collisions are enforced across owners and concurrent requests without exposing private rows');
+
   const resolved = await request('/rest/v1/rpc/resolve_public_link_redirect', { method: 'POST', body: { p_slug: slug } });
   check(resolved.ok && resolved.data?.length === 1 && resolved.data[0].target_url === destination && !('user_id' in resolved.data[0]) && !('note' in resolved.data[0]), 'Public resolver exposes only redirect data');
-  const redirected = await fetch(`${app}/${slug}?utm_source=local&utm_medium=test`, { redirect: 'manual', signal: AbortSignal.timeout(10000) });
+  const redirected = await fetchOwnedApp(`${app}/${slug}?utm_source=local&utm_medium=test`, { signal: AbortSignal.timeout(10000) });
   check(redirected.status === 307, 'Approved short link returns HTTP 307');
   const location = new URL(redirected.headers.get('location'));
   check(location.origin === 'https://example.com' && location.pathname === '/docs' && location.searchParams.get('source') === 'oss' && location.searchParams.get('utm_source') === 'local', 'Redirect retains destination and UTM parameters');
