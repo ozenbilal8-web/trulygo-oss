@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a reproducible problem using non-sensitive test data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities or leaked credentials, use SECURITY.md and report privately.
+        Do not include real user records, tokens, cookies, or environment values.
+        English and Turkish reports are welcome.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and expected behavior
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Give repeatable steps using an isolated instance and synthetic data.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Version and environment
+      description: Commit or release, Node/npm version, operating system, browser, and relevant feature flags. No credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Relevant error text or screenshots, with personal information and secrets removed.

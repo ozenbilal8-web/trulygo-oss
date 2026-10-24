@@ -1,0 +1,11 @@
+Hesabınızı doğrulayın
+
+TrulyGo hesabınızı etkinleştirmek ve panelinizi kullanmaya başlamak için e-posta adresinizi doğrulayın.
+
+E-posta adresimi doğrula:
+{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup&next=/dashboard
+
+Bu bağlantı tek kullanımlıktır ve güvenlik nedeniyle süreli olabilir.
+Bu hesabı siz oluşturmadıysanız e-postayı yok sayabilirsiniz.
+
+Destek: bu uygulamanın yöneticisi

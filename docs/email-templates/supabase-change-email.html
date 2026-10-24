@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>TrulyGo</title>
+  </head>
+  <body style="margin:0;background:#07100d;color:#eafff5;font-family:Arial,Helvetica,sans-serif;">
+    <span style="display:none!important;max-height:0;max-width:0;opacity:0;overflow:hidden;">TrulyGo hesabınızın yeni e-posta adresini doğrulayın.</span>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#07100d;padding:28px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:620px;background:#0d1915;border:1px solid #214136;border-radius:20px;overflow:hidden;">
+            <tr>
+              <td style="padding:28px 32px 18px;border-bottom:1px solid #1d352d;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding:8px 12px;background:#f4fbf7;border:1px solid #dbeee5;border-radius:12px;">
+                      <span style="font-size:24px;font-weight:800;color:#123d2d;">TrulyGo OSS</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:30px 32px 34px;">
+                <h1 style="margin:0 0 14px;font-size:25px;line-height:1.25;color:#f3fff9;">Yeni e-posta adresinizi doğrulayın</h1>
+                <p style="margin:0 0 16px;color:#b8cec5;font-size:15px;line-height:1.65;">
+                  TrulyGo hesabınızın e-posta adresini değiştirme isteğini tamamlamak için yeni adresi doğrulayın.
+                </p>
+                {{ if .NewEmail }}
+                <p style="margin:0 0 22px;padding:12px 14px;border:1px solid #1d352d;border-radius:10px;background:#09130f;color:#dff7ed;font-size:14px;line-height:1.6;word-break:break-word;">
+                  Yeni e-posta adresi: <strong>{{ .NewEmail }}</strong>
+                </p>
+                {{ end }}
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;">
+                  <tr>
+                    <td bgcolor="#56e6a8" style="border-radius:12px;text-align:center;">
+                      <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;next=/dashboard" style="display:inline-block;padding:13px 20px;border:1px solid #56e6a8;border-radius:12px;background:#56e6a8;color:#062319;font-size:14px;font-weight:800;line-height:1.2;text-decoration:none;">E-posta adresimi doğrula</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:20px 0 0;color:#789288;font-size:12px;line-height:1.6;">
+                  Buton çalışmazsa bu bağlantıyı tarayıcınıza kopyalayın:<br>
+                  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;next=/dashboard" style="color:#8ff0c4;text-decoration:underline;word-break:break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;next=/dashboard</a>
+                </p>
+                <div style="margin:22px 0 0;padding:14px 16px;border:1px solid #1d352d;border-radius:12px;background:#09130f;color:#9db8ae;font-size:12px;line-height:1.65;">
+                  Bu işlemi siz başlatmadıysanız bağlantıyı kullanmayın. Hesabınıza doğrudan {{ .SiteURL }} üzerinden giriş yaparak güvenlik ayarlarınızı kontrol edin ve bizimle iletişime geçin.
+                </div>
+                <p style="margin:24px 0 0;padding-top:18px;border-top:1px solid #1d352d;color:#789288;font-size:12px;line-height:1.6;">
+                  Yardıma ihtiyacınız varsa
+                  <a href="{{ .SiteURL }}/" style="color:#8ff0c4;text-decoration:underline;">bu uygulamanın yöneticisi</a>
+                  adresinden bize ulaşabilirsiniz.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

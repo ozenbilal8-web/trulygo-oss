@@ -1,0 +1,23 @@
+name: Feature request
+description: Describe a user need and a focused proposed improvement.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User need
+      description: Who needs this, and what is difficult today? English or Turkish is welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the outcome, scope, and alternatives you considered.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Compatibility and operational impact
+      description: Note effects on permissions, privacy, database schema, existing installations, or third-party services.

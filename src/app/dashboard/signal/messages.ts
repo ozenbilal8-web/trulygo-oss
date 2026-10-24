@@ -1,0 +1,37 @@
+export const signalEditorErrorMessages = {
+  auth_not_configured:
+    "Supabase bağlantısı yapılandırılmadığı için Signal anketi kaydedilemedi.",
+  unauthenticated: "Anket oluşturmak için tekrar giriş yapın.",
+  invalid_payload: "Anket verisi okunamadı. Sayfayı yenileyip tekrar deneyin.",
+  missing_title: "Anket adı boş olamaz.",
+  invalid_title: "Anket adı en fazla 100 karakter olabilir.",
+  invalid_description: "Kısa açıklama en fazla 240 karakter olabilir.",
+  invalid_slug: "Slug yalnızca küçük harf, rakam ve tire içermeli; 2-80 karakter olmalı.",
+  reserved_slug: "Bu slug sistem tarafından ayrılmış. Lütfen farklı bir slug deneyin.",
+  invalid_status: "Anket durumu yalnızca taslak, yayında veya kapalı olabilir.",
+  invalid_question_count: "Bir anket 1-20 ana soru içermelidir.",
+  invalid_question: "Her soru için geçerli ve boş olmayan bir soru metni gerekir.",
+  invalid_question_id: "Soru kimliği geçersiz. Sayfayı yenileyip tekrar deneyin.",
+  invalid_option_count: "Her ana soru 2-6 şık içermelidir.",
+  invalid_option: "Her şık için geçerli ve boş olmayan bir metin gerekir.",
+  invalid_option_id: "Şık kimliği geçersiz. Sayfayı yenileyip tekrar deneyin.",
+  invalid_branch: "Dallanma sorusu için geçerli bir soru metni gerekir.",
+  invalid_branch_id: "Dallanma soru kimliği geçersiz. Sayfayı yenileyip tekrar deneyin.",
+  invalid_branch_trigger: "Dallanma sorusu bir ana şıkka bağlı olmalıdır.",
+  invalid_branch_option_count: "Dallanma sorusu 2-4 şık içermelidir.",
+  invalid_branch_option: "Dallanma şıkları boş olamaz.",
+  not_found: "Anket bulunamadı veya bu anketi düzenleme yetkiniz yok.",
+  save_failed: "Anket kaydedilemedi. Bilgileri kontrol edip tekrar deneyin.",
+  delete_failed: "Anket silinemedi. Lütfen tekrar deneyin.",
+  slug_unavailable: "Bu Signal slug'ı başka bir ankette kullanılıyor.",
+  rate_limited: "Çok kısa sürede çok fazla kayıt denendi. Lütfen biraz bekleyip tekrar deneyin.",
+} as const;
+
+export const signalEditorSuccessMessages = {
+  saved: "Anket kaydedildi.",
+  published: "Anket yayına alındı.",
+  updated: "Anket güncellendi.",
+  closed: "Anket kapatıldı.",
+  reopened: "Anket yeniden yayına alındı.",
+  visibility_updated: "Sonuç görünürlüğü güncellendi.",
+} as const;

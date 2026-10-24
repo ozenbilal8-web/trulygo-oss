@@ -1,0 +1,152 @@
+-- Signal vote: atomic write + server-side soft dedup.
+--
+-- What this migration does:
+--   1. Replaces the non-unique (survey_id, voter_token_hash) index with a
+--      PARTIAL UNIQUE index so the same survey-scoped voter hash can be stored
+--      at most once. The partial `where voter_token_hash is not null` clause
+--      means hash-less rows (cookie-disabled voters, or prod without the hash
+--      secret) never collide — they simply skip this dedup layer.
+--   2. Adds a SECURITY DEFINER RPC `submit_signal_vote` that writes the response
+--      and all of its answers in a SINGLE transaction. Previously the action did
+--      two separate inserts; a failure between them left an orphan response.
+--
+-- Safe on existing data: today every signal_responses.voter_token_hash holds a
+-- distinct sha256 of a random per-vote token, so creating the unique index
+-- cannot fail on a duplicate. No rows are read, rewritten or deleted.
+--
+-- Not touched: RLS policies, anon/authenticated insert policies + column grants
+-- (left as-is — the SECURITY DEFINER RPC validates published + membership itself
+-- and does not rely on, or widen, those policies), the click-tracking dedup, the
+-- auto-approve edge function, redirect RPCs, Link Vitrini, pricing.
+
+-- ============================================================================
+-- 1. Partial unique index for survey-scoped voter dedup
+-- ============================================================================
+
+drop index if exists public.signal_responses_voter_token_hash_idx;
+
+create unique index if not exists signal_responses_survey_voter_unique
+on public.signal_responses (survey_id, voter_token_hash)
+where voter_token_hash is not null;
+
+-- ============================================================================
+-- 2. Atomic vote-submission RPC
+-- ============================================================================
+--
+-- Returns a short status string the application maps to a friendly message:
+--   'ok'            — response + answers written.
+--   'already_voted' — the (survey_id, voter_token_hash) pair already exists.
+--   'not_found'     — survey id does not exist.
+--   'not_published' — survey exists but is not published.
+--   'empty'         — answers payload was an empty array.
+--   'invalid_answer'— a (question_id, option_id) pair does not belong to this
+--                     survey, or an id was not a valid uuid.
+--
+-- Security: SECURITY DEFINER so it can write while bypassing RLS, but it
+-- re-validates published status and every (option -> question -> survey)
+-- membership server-side. The branch/flow shape (which follow-up is required
+-- for which trigger option) stays validated in the application layer; the RPC
+-- is the integrity boundary for "this option really belongs to this survey",
+-- atomicity and dedup.
+create or replace function public.submit_signal_vote(
+  p_survey_id uuid,
+  p_voter_token_hash text,
+  p_answers jsonb
+)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_status text;
+  v_normalized_hash text;
+  v_response_id uuid;
+  v_answer jsonb;
+  v_question_id uuid;
+  v_option_id uuid;
+begin
+  -- Survey must exist and be published.
+  select s.status into v_status
+  from public.signal_surveys s
+  where s.id = p_survey_id;
+
+  if v_status is null then
+    return 'not_found';
+  end if;
+
+  if v_status <> 'published' then
+    return 'not_published';
+  end if;
+
+  -- Payload must be a non-empty JSON array.
+  if p_answers is null or pg_catalog.jsonb_typeof(p_answers) <> 'array' then
+    return 'invalid_answer';
+  end if;
+
+  if pg_catalog.jsonb_array_length(p_answers) = 0 then
+    return 'empty';
+  end if;
+
+  -- Validate every answer: the option must exist, belong to the given question,
+  -- and that question must belong to this survey.
+  for v_answer in
+    select e.value
+    from pg_catalog.jsonb_array_elements(p_answers) as e(value)
+  loop
+    begin
+      v_question_id := (v_answer ->> 'question_id')::uuid;
+      v_option_id := (v_answer ->> 'option_id')::uuid;
+    exception
+      when others then
+        return 'invalid_answer';
+    end;
+
+    if v_question_id is null or v_option_id is null then
+      return 'invalid_answer';
+    end if;
+
+    if not exists (
+      select 1
+      from public.signal_options o
+      join public.signal_questions q on q.id = o.question_id
+      where o.id = v_option_id
+        and o.question_id = v_question_id
+        and q.survey_id = p_survey_id
+    ) then
+      return 'invalid_answer';
+    end if;
+  end loop;
+
+  -- Treat blank hashes as null so the partial unique index ignores them.
+  v_normalized_hash := nullif(pg_catalog.btrim(pg_catalog.coalesce(p_voter_token_hash, '')), '');
+
+  -- Insert the response. A repeat vote trips the partial unique index; we map
+  -- that to 'already_voted' rather than surfacing a constraint error. The id is
+  -- generated by the table default.
+  begin
+    insert into public.signal_responses (survey_id, voter_token_hash, completed_at)
+    values (p_survey_id, v_normalized_hash, pg_catalog.now())
+    returning id into v_response_id;
+  exception
+    when unique_violation then
+      return 'already_voted';
+  end;
+
+  -- Insert every answer in the same transaction. Validation above guarantees the
+  -- option/question FK is satisfied, so this cannot leave an orphan response: any
+  -- unexpected failure rolls back the response insert too.
+  insert into public.signal_answers (response_id, survey_id, question_id, option_id)
+  select
+    v_response_id,
+    p_survey_id,
+    (e.value ->> 'question_id')::uuid,
+    (e.value ->> 'option_id')::uuid
+  from pg_catalog.jsonb_array_elements(p_answers) as e(value);
+
+  return 'ok';
+end;
+$$;
+
+revoke all on function public.submit_signal_vote(uuid, text, jsonb) from public;
+grant execute on function public.submit_signal_vote(uuid, text, jsonb) to anon, authenticated;

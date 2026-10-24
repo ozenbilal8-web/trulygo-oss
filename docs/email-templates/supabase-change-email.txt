@@ -1,0 +1,11 @@
+Yeni e-posta adresinizi doğrulayın
+
+TrulyGo hesabınızın e-posta adresini değiştirme isteğini tamamlamak için yeni adresi doğrulayın.
+{{ if .NewEmail }}Yeni e-posta adresi: {{ .NewEmail }}{{ end }}
+
+E-posta adresimi doğrula:
+{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard
+
+Bu işlemi siz başlatmadıysanız bağlantıyı kullanmayın. Hesabınıza doğrudan {{ .SiteURL }} üzerinden giriş yaparak güvenlik ayarlarınızı kontrol edin ve bizimle iletişime geçin.
+
+Destek: bu uygulamanın yöneticisi
