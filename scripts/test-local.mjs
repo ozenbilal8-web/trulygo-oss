@@ -34,7 +34,9 @@ function fetchOwnedApp(url, options = {}) {
   // to another IPv6 listener.
   const host = target.host;
   target.hostname = '127.0.0.1';
-  return fetch(target, { ...options, redirect: 'manual', headers: { ...options.headers, Host: host } });
+  return fetch(target, { ...options, redirect: 'manual', headers: {
+    ...options.headers, Host: host, 'X-Forwarded-Host': host, 'X-Forwarded-Proto': 'http',
+  } });
 }
 
 async function request(path, { token = anon, method = 'GET', body, prefer } = {}) {
