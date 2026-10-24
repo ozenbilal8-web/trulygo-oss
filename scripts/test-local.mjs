@@ -108,8 +108,11 @@ async function localConfirmationLink(email) {
   throw new Error('Local confirmation email did not arrive in Mailpit.');
 }
 
-async function createTestUser(prefix) {
-  const result = await request('/auth/v1/admin/users', { token: service, method: 'POST', body: { email: `${prefix}-${runId}@example.test`, password, email_confirm: true } });
+async function createTestUser(prefix, metadata) {
+  const result = await request('/auth/v1/admin/users', { token: service, method: 'POST', body: {
+    email: `${prefix}-${runId}@example.test`, password, email_confirm: true,
+    ...(metadata === undefined ? {} : { user_metadata: metadata }),
+  } });
   check(result.ok && result.data?.id, 'Local fixture account creation');
   createdUsers.push(result.data.id);
   return { id: result.data.id, email: `${prefix}-${runId}@example.test` };
@@ -134,6 +137,23 @@ try {
   const confirmation = await unauthenticated(await localConfirmationLink(ownerEmail));
   assertRedirect(confirmation, '/dashboard', 'Email confirmation');
   passed('real signup Server Action, local email confirmation and session cookie');
+
+  const consentCases = [
+    ['missing', {}, false],
+    ['null', { marketing_consent: null }, false],
+    ['malformed', { marketing_consent: 'not-a-boolean' }, false],
+    ['object', { marketing_consent: { value: true } }, false],
+    ['true', { marketing_consent: true }, true],
+    ['false', { marketing_consent: false }, false],
+    ['text-true', { marketing_consent: 'true' }, true],
+    ['text-false', { marketing_consent: 'false' }, false],
+  ];
+  for (const [label, metadata, expected] of consentCases) {
+    const fixture = await createTestUser(`consent-${label}`, { ...metadata, role: 'admin' });
+    const profile = await request(`/rest/v1/profiles?id=eq.${fixture.id}&select=id,marketing_consent,role`, { token: service });
+    check(profile.ok && profile.data?.length === 1 && profile.data[0].marketing_consent === expected && profile.data[0].role === 'user', `Auth trigger safely defaults consent metadata (${label}) and ignores role escalation`);
+  }
+  passed('real Auth insert trigger handles missing/null/malformed/true/false consent and rejects metadata role escalation');
 
   const owner = client();
   assertRedirect(await submitForm(owner, '/login', 'name="password"', { email: ownerEmail, password }), '/dashboard', 'Login');
@@ -207,7 +227,7 @@ try {
       p_web_risk_checked_at: new Date().toISOString(),
     },
   });
-  const createOwnerChannel = (channelSlug, key) => request('/rest/v1/channel_links', {
+  const createOwnerChannel = (channelSlug, key) => request('/rest/v1/channel_links?select=id,slug', {
     token: ownerToken, method: 'POST', prefer: 'return=representation',
     body: { link_request_id: record.id, user_id: ownerId, slug: channelSlug, channel_key: key, channel_label: 'Local integration', utm_source: 'local', utm_medium: 'test', utm_campaign: 'integration' },
   });
