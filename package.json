@@ -65,7 +65,7 @@
     "eslint-config-next": "16.4.3",
     "supabase": "2.98.2",
     "tailwindcss": "4.3.0",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   },
   "overrides": {
     "postcss": "8.5.23",
