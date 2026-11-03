@@ -46,7 +46,7 @@
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "exceljs": "^4.4.0",
-    "geist": "1.7.0",
+    "geist": "1.8.1",
     "jszip": "^3.10.1",
     "next": "16.4.3",
     "pdf-lib": "^1.17.1",
